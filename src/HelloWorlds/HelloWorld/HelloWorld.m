@@ -1,13 +1,55 @@
 #include <Cocoa/Cocoa.h>
+#include <Carbon/Carbon.h>
 
-@interface Window : NSWindow {
+OSStatus HotkeyPressedHandler(EventHandlerCallRef _inCaller __unused, EventRef inEvent, void *inUserData);
+OSStatus HotkeyPressedHandler(EventHandlerCallRef _inCaller __unused, EventRef inEvent, void *inUserData) {
+    EventHotKeyID hotKeyID;
+
+    // Get the hotKeyID corresponding to the pressed hot key.
+    if (GetEventParameter(inEvent, kEventParamDirectObject, typeEventHotKeyID, nil,
+                          sizeof(EventHotKeyID), nil, &hotKeyID)) {
+        return eventNotHandledErr;
+    }
+
+    if (hotKeyID.id == 0) {
+        NSLog(@"activating app...");
+        [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
+        return 0;
+    }
+
+    return eventNotHandledErr;
+}
+
+@interface MyDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@implementation MyDelegate {}
+
+- (id)init {
+    [super init];
+
+    EventTypeSpec eventType = {kEventClassKeyboard, kEventHotKeyPressed};
+    InstallApplicationEventHandler(HotkeyPressedHandler, 1, &eventType, self, NULL);
+    
+    EventHotKeyRef hotKeyRef = NULL;
+    EventHotKeyID hotKeyID = {0, 0};
+
+    // ctrl-g is the hotkey
+    RegisterEventHotKey(5, 4096, hotKeyID, GetEventDispatcherTarget(), 0, &hotKeyRef);
+
+    return self;
+}
+
+@end
+
+@interface MyWindow : NSWindow {
   NSTextField* label;
 }
 - (instancetype)init;
 - (BOOL)windowShouldClose:(id)sender;
 @end
 
-@implementation Window
+@implementation MyWindow
 - (instancetype)init {
   label = [[[NSTextField alloc] initWithFrame:NSMakeRect(5, 100, 290, 100)] autorelease];
   [label setStringValue:@"Hello, World!"];
@@ -33,7 +75,9 @@
 @end
 
 int main(int argc, char* argv[]) {
-  [NSApplication sharedApplication];
-  [[[[Window alloc] init] autorelease] makeMainWindow];
+  NSApplication *app = [NSApplication sharedApplication];
+  MyDelegate *delegate = [[MyDelegate alloc] init];
+  [app setDelegate:delegate];
+  [[[[MyWindow alloc] init] autorelease] makeMainWindow];
   [NSApp run];
 }
